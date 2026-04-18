@@ -24,9 +24,9 @@ const protect = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = await User.findById(decoded.id).select('-password');
-    next();
-  } catch {
-    res.status(401).json({ success: false, message: 'Token invalid' });
+    return next();
+  } catch (err) {
+    return res.status(401).json({ success: false, message: 'Token invalid' });
   }
 };
 
@@ -38,12 +38,12 @@ app.post('/auth/register', async (req, res) => {
   if (!name || !email || !password)
     return res.status(400).json({ success: false, message: 'All fields required' });
   try {
-    const exists = await User.findOne({ email });
+    const exists = await User.findOne({ email: email.toLowerCase() });
     if (exists) return res.status(400).json({ success: false, message: 'Email already registered' });
-    const user = await User.create({ name, email, password });
-    res.json({ success: true, token: generateToken(user._id), user: { id: user._id, name: user.name, email: user.email, loyaltyPoints: user.loyaltyPoints } });
+    const user = await User.create({ name, email: email.toLowerCase(), password });
+    return res.json({ success: true, token: generateToken(user._id), user: { id: user._id, name: user.name, email: user.email, loyaltyPoints: user.loyaltyPoints } });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    return res.status(500).json({ success: false, message: err.message });
   }
 });
 
@@ -165,7 +165,24 @@ app.post('/orders/checkout', protect, async (req, res) => {
   }
 });
 
-// ── USER ──────────────────────────────────────────────────
+app.put('/orders/:id/status', protect, async (req, res) => {
+  try {
+    const { status } = req.body;
+    const allowed = ['Processing', 'Shipped', 'Delivered', 'Cancelled', 'Return Requested'];
+    if (!allowed.includes(status))
+      return res.status(400).json({ success: false, message: 'Invalid status' });
+    const order = await Order.findOne({ id: req.params.id, userId: req.user._id });
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+    order.status = status;
+    if (status === 'Delivered') order.deliveredOn = new Date().toISOString().split('T')[0];
+    if (status === 'Cancelled') { order.cancelledOn = new Date().toISOString().split('T')[0]; order.refundStatus = 'Initiated'; }
+    await order.save();
+    res.json({ success: true, data: order });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 app.get('/user', protect, async (req, res) => {
   const user = await User.findById(req.user._id).select('-password');
   res.json({ success: true, data: user });
