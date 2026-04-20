@@ -318,4 +318,12 @@ app.post('/botpress/get-products', async (req, res) => {
 
 // ── START ─────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`✅ Nexus Store API running on http://localhost:${PORT}`));
+app.listen(PORT, () => {
+  console.log(`✅ Nexus Store API running on http://localhost:${PORT}`);
+  // Keep Render free tier awake by pinging every 14 minutes
+  setInterval(() => {
+    require('https').get('https://nexus-store-backend.onrender.com/config', (res) => {
+      console.log('Keep-alive ping:', res.statusCode);
+    }).on('error', () => {});
+  }, 14 * 60 * 1000);
+});
