@@ -207,6 +207,20 @@ const getBotpressUser = async (email) => {
   return await User.findOne({ email: email.toLowerCase() });
 };
 
+// Token-based identity resolution for Botpress actions
+app.post('/botpress/identify', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.json({ email: null });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id).select('email name');
+    if (!user) return res.json({ email: null });
+    res.json({ email: user.email, name: user.name });
+  } catch {
+    res.json({ email: null });
+  }
+});
+
 app.post('/botpress/get-orders', async (req, res) => {
   try {
     const user = await getBotpressUser(req.body.userEmail);
