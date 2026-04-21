@@ -202,14 +202,12 @@ app.get('/config', (req, res) => {
 // ── BOTPRESS ACTION APIs ─────────────────────────────────
 // These are called by Botpress cloud — no JWT, uses email to identify user
 
-const getBotpressUser = async (email, conversationId) => {
-  // If the conversation ID does not start with the authenticated prefix,
-  // it means the user is anonymous and the LLM might be hallucinating the email.
-  if (!conversationId || !conversationId.startsWith('nexus-conv-')) {
+const getBotpressUser = async (botpressUserId) => {
+  if (!botpressUserId || !botpressUserId.startsWith('nexus-user-')) {
     return null;
   }
-  if (!email) return null;
-  return await User.findOne({ email: email.toLowerCase() });
+  const dbId = botpressUserId.replace('nexus-user-', '');
+  return await User.findById(dbId);
 };
 
 // Token-based identity resolution for Botpress actions
@@ -228,7 +226,7 @@ app.post('/botpress/identify', async (req, res) => {
 
 app.post('/botpress/get-orders', async (req, res) => {
   try {
-    const user = await getBotpressUser(req.body.userEmail, req.body.conversationId);
+    const user = await getBotpressUser(req.body.botpressUserId);
     if (!user) return res.json({ result: 'Please log in to the Nexus Store website to view your orders.' });
     const orders = await Order.find({ userId: user._id }).sort({ createdAt: -1 });
     if (!orders.length) return res.json({ result: 'You have no orders yet.' });
@@ -243,8 +241,8 @@ app.post('/botpress/get-orders', async (req, res) => {
 
 app.post('/botpress/track-order', async (req, res) => {
   try {
-    const { userEmail, conversationId, orderId } = req.body;
-    const user = await getBotpressUser(userEmail, conversationId);
+    const { botpressUserId, orderId } = req.body;
+    const user = await getBotpressUser(botpressUserId);
     if (!user) return res.json({ result: 'Please log in to the Nexus Store website to track your orders.' });
     const order = await Order.findOne({ id: orderId, userId: user._id });
     if (!order) return res.json({ result: `Order ${orderId} not found on your account.` });
@@ -258,8 +256,8 @@ app.post('/botpress/track-order', async (req, res) => {
 
 app.post('/botpress/cancel-order', async (req, res) => {
   try {
-    const { userEmail, conversationId, orderId, reason } = req.body;
-    const user = await getBotpressUser(userEmail, conversationId);
+    const { botpressUserId, orderId, reason } = req.body;
+    const user = await getBotpressUser(botpressUserId);
     if (!user) return res.json({ result: 'Please log in to the Nexus Store website to view your order.' });
     const order = await Order.findOne({ id: orderId, userId: user._id });
     if (!order) return res.json({ result: `Order ${orderId} not found on your account.` });
@@ -277,8 +275,8 @@ app.post('/botpress/cancel-order', async (req, res) => {
 
 app.post('/botpress/return-order', async (req, res) => {
   try {
-    const { userEmail, conversationId, orderId, reason } = req.body;
-    const user = await getBotpressUser(userEmail, conversationId);
+    const { botpressUserId, orderId, reason } = req.body;
+    const user = await getBotpressUser(botpressUserId);
     if (!user) return res.json({ result: 'Please log in to the Nexus Store website to view your order.' });
     const order = await Order.findOne({ id: orderId, userId: user._id });
     if (!order) return res.json({ result: `Order ${orderId} not found on your account.` });
@@ -295,8 +293,8 @@ app.post('/botpress/return-order', async (req, res) => {
 
 app.post('/botpress/refund-status', async (req, res) => {
   try {
-    const { userEmail, conversationId } = req.body;
-    const user = await getBotpressUser(userEmail, conversationId);
+    const { botpressUserId } = req.body;
+    const user = await getBotpressUser(botpressUserId);
     if (!user) return res.json({ result: 'Please log in to the Nexus Store website first.' });
     const refunds = await Order.find({ userId: user._id, refundStatus: { $ne: null } });
     if (!refunds.length) return res.json({ result: 'No refunds found on your account.' });
@@ -311,8 +309,8 @@ app.post('/botpress/refund-status', async (req, res) => {
 
 app.post('/botpress/get-user', async (req, res) => {
   try {
-    const { userEmail, conversationId } = req.body;
-    const user = await getBotpressUser(userEmail, conversationId);
+    const { botpressUserId } = req.body;
+    const user = await getBotpressUser(botpressUserId);
     if (!user) return res.json({ result: 'Please log in to the Nexus Store website first.' });
     res.json({
       result: `Name: ${user.name}\nEmail: ${user.email}\nPhone: ${user.phone || 'Not set'}\nAddress: ${user.address?.line1 ? `${user.address.line1}, ${user.address.city} – ${user.address.pincode}` : 'Not set'}\nMember Since: ${user.memberSince}\nLoyalty Points: ${user.loyaltyPoints}`
