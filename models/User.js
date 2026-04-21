@@ -18,6 +18,7 @@ const userSchema = new mongoose.Schema({
   memberSince: { type: String, default: () => new Date().toLocaleString('en-IN', { month: 'long', year: 'numeric' }) },
   loyaltyPoints: { type: Number, default: 0 },
   savedCards: { type: [String], default: [] },
+  botpressSessionId: { type: String, default: null }
 }, { timestamps: true });
 
 userSchema.pre('save', async function () {

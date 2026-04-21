@@ -203,24 +203,27 @@ app.get('/config', (req, res) => {
 // These are called by Botpress cloud — no JWT, uses email to identify user
 
 const getBotpressUser = async (botpressUserId) => {
-  if (!botpressUserId || !botpressUserId.startsWith('nexus-user-')) {
-    return null;
-  }
-  const dbId = botpressUserId.replace('nexus-user-', '');
-  return await User.findById(dbId);
+  if (!botpressUserId || botpressUserId === 'undefined') return null;
+  return await User.findOne({ botpressSessionId: botpressUserId });
 };
 
 // Token-based identity resolution for Botpress actions
 app.post('/botpress/identify', async (req, res) => {
   try {
-    const { token } = req.body;
-    if (!token) return res.json({ email: null });
+    const { token, botpressSessionId } = req.body;
+    if (!token || !botpressSessionId) return res.json({ success: false });
+    
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id).select('email name');
-    if (!user) return res.json({ email: null });
-    res.json({ email: user.email, name: user.name });
-  } catch {
-    res.json({ email: null });
+    const user = await User.findById(decoded.id);
+    if (!user) return res.json({ success: false });
+    
+    // Bind the random Botpress Cloud UUID to this Database Profile completely securely
+    user.botpressSessionId = botpressSessionId;
+    await user.save();
+    
+    res.json({ success: true, email: user.email, name: user.name });
+  } catch (err) {
+    res.json({ success: false });
   }
 });
 
