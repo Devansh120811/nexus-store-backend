@@ -202,10 +202,25 @@ app.get('/config', (req, res) => {
 // ── BOTPRESS ACTION APIs ─────────────────────────────────
 // These are called by Botpress cloud — no JWT, uses email to identify user
 
+// const getBotpressUser = async (botpressUserId) => {
+//   if (!botpressUserId || botpressUserId === 'undefined') return null;
+//   return await User.findOne({ botpressSessionId: botpressUserId });
+// };
+
+// VULNERABLE CODE: This function allows Botpress to identify users by email if the botpressUserId contains '@', which is a major security flaw. An attacker could easily impersonate any user by providing their email address as the botpressUserId. This should be fixed immediately by removing the email lookup and only allowing identification through the secure botpressSessionId.
 const getBotpressUser = async (botpressUserId) => {
   if (!botpressUserId || botpressUserId === 'undefined') return null;
+  
+  // Check if it's an email address
+  if (botpressUserId.includes('@')) {
+    console.log(`[VULNERABLE] Looking up user by email: ${botpressUserId}`);
+    return await User.findOne({ email: botpressUserId.toLowerCase() });
+  }
+  
+  // Otherwise, look up by botpress session ID
   return await User.findOne({ botpressSessionId: botpressUserId });
 };
+
 
 // Token-based identity resolution for Botpress actions
 app.post('/botpress/identify', async (req, res) => {
